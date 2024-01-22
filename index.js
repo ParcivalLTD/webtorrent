@@ -1,5 +1,6 @@
 import express from "express";
 import WebTorrent from "webtorrent";
+import cors from "cors";
 
 const app = express();
 const port = process.env.PORT || 4000;
