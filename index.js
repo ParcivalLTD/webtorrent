@@ -1,60 +1,46 @@
 import express from "express";
 import WebTorrent from "webtorrent";
-import archiver from "archiver";
-import cors from "cors";
 
 const app = express();
 const port = process.env.PORT || 4000;
 
-// Enable CORS for all routes
+app.use(express.json());
 app.use(
   cors({
     origin: "*",
   })
 );
 
-// Setup WebTorrent
 const client = new WebTorrent();
 
-app.get("/download/:magnetLink", (req, res) => {
-  const { magnetLink } = req.params;
-  const torrent = client.add(magnetLink);
+app.post("/download", async (req, res) => {
+  try {
+    const { magnetLink } = req.body;
 
-  const archive = archiver("zip", {
-    zlib: { level: 9 }, // Set compression level
-  });
+    if (!magnetLink) {
+      return res.status(400).json({ error: "Magnet link is required" });
+    }
 
-  // Set response headers
-  res.setHeader("Content-Type", "application/zip");
-  res.setHeader("Content-Disposition", `attachment; filename=${torrent.name}.zip`);
-
-  // Pipe archive to the response
-  archive.pipe(res);
-
-  // Listen for progress updates
-  torrent.on("download", () => {
-    const progress = (torrent.progress * 100).toFixed(2);
-    console.log(`Download progress: ${progress}%`);
-  });
-
-  // Add torrent files to the zip archive
-  torrent.on("ready", () => {
-    torrent.files.forEach((file) => {
-      archive.append(file.createReadStream(), { name: file.name });
+    const torrent = await new Promise((resolve, reject) => {
+      client.add(magnetLink, { path: "/tmp" }, (torrent) => {
+        resolve(torrent);
+      });
     });
 
-    // Finalize the archive and end the response
-    archive.finalize();
-  });
+    const files = torrent.files.map((file) => {
+      return {
+        name: file.name,
+        size: file.length,
+      };
+    });
 
-  // Handle errors
-  torrent.on("error", (err) => {
-    console.error(`Torrent error: ${err}`);
-    res.status(500).send("Error downloading torrent");
-  });
+    res.json({ files });
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
-// Start the server
 app.listen(port, () => {
-  console.log(`Server is running at http://localhost:${port}`);
+  console.log(`Server is running on http://localhost:${port}`);
 });
