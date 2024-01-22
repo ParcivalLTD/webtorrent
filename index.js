@@ -7,7 +7,11 @@ const app = express();
 const port = process.env.PORT || 4000;
 
 // Enable CORS for all routes
-app.use(cors());
+app.use(
+  cors({
+    origin: "*",
+  })
+);
 
 // Setup WebTorrent
 const client = new WebTorrent();
